@@ -47,6 +47,12 @@ def recv():
                             temp.append(value)
                             combo.configure(values=temp)
 
+                            # i did this becouse when 2 clients are talking
+                            # then some clients will be sent the same
+                            #file no when onother client comes
+                            #to aviod i will make sure that
+                            #fileno doesnot exist in temp
+
                 print(temp, "from")
 
 
