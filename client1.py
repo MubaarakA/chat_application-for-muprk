@@ -16,12 +16,10 @@ except ConnectionRefusedError as E:
     print(E)
     connected = False
 
-
 No_Of_Messages = 0
 offline_messages = {}
 chat_history = {}  # Global list to store chat history
 talking_client = None
-
 
 def update_offline_messages(data):
     global No_Of_Messages
@@ -29,8 +27,6 @@ def update_offline_messages(data):
         No_Of_Messages += 1
         label_no_message.configure(text=f"Number of messages you have {No_Of_Messages}")
         return
-
-
 
 def recv_chat_insertion(data):
     text.configure(state="normal")
@@ -45,22 +41,15 @@ def send_chat_insertion(data):
 def handle_received_in_open_window(data):
     Formatted_Message = data.split(":")[0]
     text.after(0, recv_chat_insertion, Formatted_Message)
-
-    update_chat_history(Formatted_Message,"recv")
-
-
-
+    update_chat_history(Formatted_Message, "recv")
 
 def handle_received_in_closed_window(data):
     Formatted_Message = data.split(":")[0]
     offlineclient = int(data.split(":")[1])
-    print(offlineclient, "clientcleint")
     if offlineclient not in offline_messages:
         offline_messages[offlineclient] = []
     offline_messages[offlineclient].append(Formatted_Message)
     label_no_message.after(0, update_offline_messages, "label")
-
-
 
 temp = set()  # holds what user can chat with because user can choose 1 or more people
 def users_to_talk_to(data):
@@ -71,114 +60,73 @@ def users_to_talk_to(data):
             value = i.split(":")[1]
             offline_messages[value] = {}
             temp.add(value)
-
-
     combo.configure(values=list(temp))
+
 def recv():
     global No_Of_Messages, offline_messages, talking_client, chat_history
-
     while True:
         try:
             data = clientsocket.recv(1024).decode()
             print(data)
-
             if data.endswith(":opened"):
                 handle_received_in_open_window(data)
                 continue
-
             if data.endswith(":closed"):
                 handle_received_in_closed_window(data)
-
-
             if data.startswith("combo:"):
                 users_to_talk_to(data)
-
-
         except ConnectionResetError as E:
             print(E)
             label.configure(foreground="black")
             break
     clientsocket.close()
 
-
 initiate = False
 
-
-def update_chat_history(data,message_type):
+def update_chat_history(data, message_type):
     global chat_history
-    if message_type=="recv":
+    if message_type == "recv":
         if talking_client not in chat_history:
             chat_history[talking_client] = []
-
         chat_history[talking_client].append({"recv": data})
-
-    if message_type=="sent":
+    if message_type == "sent":
         if talking_client not in chat_history:
             chat_history[talking_client] = []
-
         chat_history[talking_client].append({"sent": data})
-
     print(chat_history)
-
-
 
 def sendata():
     global chat_history, talking_client
-    print(talking_client, "talking clinet")
     if initiate:
         x = entry.get()
         clientsocket.send(x.encode("utf-8"))
         send_chat_insertion(x)
-        update_chat_history(x,"sent")
-
-
-
-
-
-
+        update_chat_history(x, "sent")
     else:
         messagebox.showerror(message="please select someone to talk to")
 
-
-
-
-
 def calculate_remaining_missed_messages(client):
     global No_Of_Messages
-    message_list=[]
+    message_list = []
     for length in offline_messages[client]:
         message_list.append(length)
-    total_offline_messages=len(message_list)
-    return No_Of_Messages-total_offline_messages
-
-
+    total_offline_messages = len(message_list)
+    return No_Of_Messages - total_offline_messages
 
 def Load_Offlinemessages(client):
     global No_Of_Messages
-    print(client, "oooooooooo")
-    print(offline_messages)
     if client == None:
         return
     if client in offline_messages:
-
         text.configure(state="normal")
         for message in offline_messages[client]:
             text.insert(tk.END, f"{message}\n", "recv")
-
-
         text.configure(state="disabled")
-
-
-
-        No_Of_Messages=calculate_remaining_missed_messages(client)
-
-
+        No_Of_Messages = calculate_remaining_missed_messages(client)
 
 def load_chat_history(client):
     if client == None:
-        print(client, "clinet")
         return
-
     text.configure(state="normal")
     if chat_history:
         for message in chat_history[client]:
@@ -187,120 +135,85 @@ def load_chat_history(client):
                     text.insert(tk.END, f"{value}\n", "recv")
                 if key == "sent":
                     text.insert(tk.END, f"{value}\n", "sent")
-
     text.configure(state="disabled")
-
 
 def ChoosedOne():
     global initiate, talking_client
     message = None
     data = combo.get()
-
     talking_client = int(data)
     someone = {"someone": data}
     someone = json.dumps(someone)
-
     if len(data) < 1:
         messagebox.showerror(message="Enter Some Thing To Send")
         return
     try:
         clientsocket.send(someone.encode("utf-8"))
         initiate = True
-
         if chat_history:
             for i in chat_history:
                 if int(i) == talking_client:
                     talking_client = int(i)
                     break
-
         if offline_messages:
             for fileno in offline_messages:
-                print(fileno, "f")
                 if int(fileno) == talking_client:
                     message = int(fileno)
                     break
-
         users.withdraw()
         new_window(talking_client, message)
-
-
-
-
     except OSError as E:
         print(E)
-
     initiate = True
-    print(initiate)
-
 
 def Window_State(state):
     clientsocket.send(state.encode("utf-8"))
 
-
 def back_to_main():
     global No_Of_Messages
-    print(No_Of_Messages)
     Window_State("closed")
     chat.withdraw()  # Close the current root (chat window)
     users.deiconify()  # Show the root1 window again
     label_no_message.configure(text=f"Number of messages you have {No_Of_Messages}")
 
-
 def new_window(talkingclient=None, message=None):
     global text, entry, chat
-
-    print(talkingclient, message)
-
     chat = tk.Toplevel()
-    label = tk.Button(chat, text="back", command=back_to_main)
+    label = ttk.CTkButton(chat, text="Back", command=back_to_main)  # Changed to CTkButton
     label.pack(side="top", anchor="w")
-
     chat.geometry("500x500")
     chat.attributes("-topmost", True)
     chat.title("ChatApp")
-
     text = tk.Text(chat, wrap="word", state="disabled")
     text.pack(fill="both", expand=True)
     text.tag_configure("sent", justify="right")
     text.tag_configure("recv", justify="left", foreground="blue")
     text.tag_configure("server", justify="center", foreground="red")
-
-    entry = tk.Entry(chat)
+    entry = ttk.CTkEntry(chat)  # Changed to CTkEntry
     entry.pack(side=tk.LEFT, fill="both", padx=10, pady=10, expand=True)
-    button = tk.Button(chat, text="send", command=sendata).pack(side=tk.LEFT, fill=tk.X, padx=10, pady=10, expand=True)
-
+    button = ttk.CTkButton(chat, text="Send", command=sendata)  # Changed to CTkButton
+    button.pack(side=tk.LEFT, fill=tk.X, padx=10, pady=10, expand=True)
     Window_State("opened")
     load_chat_history(talkingclient)
     Load_Offlinemessages(message)
 
-
-
-
 users = tk.Tk()
 users.geometry("500x500")
 users.attributes("-topmost", True)
-users.title("aaaaa")
-frame = tk.Frame(users)
-
-label = tk.Label(frame, text="chooseee some one to talk to")
+users.title("user")
+frame = ttk.CTkFrame(users)  # Changed to CTkFrame
+label = ttk.CTkLabel(frame, text="Choose someone to talk to")  # Changed to CTkLabel
 label.pack(side="left")
-
 combo = ttk.CTkComboBox(frame)
 combo.pack(side="left")
-combo.set("choose")
-
-
+combo.set("Choose")
 button = ttk.CTkButton(frame, text="Talk", fg_color='#700000', cursor="hand2", command=ChoosedOne,
                        hover_color='#911616', text_color="white").pack(side=tk.LEFT, padx=10, pady=10)
-
 frame.pack(fill="both", expand=True, padx=10)
-
-label_no_message = tk.Label(users, text=f"Number of messages you have {No_Of_Messages}")
+label_no_message = ttk.CTkLabel(users, text=f"Number of messages you have {No_Of_Messages}")  # Changed to CTkLabel
 label_no_message.pack(side="bottom")
-
 thread1 = threading.Thread(target=recv, daemon=True)
 if connected:
     thread1.start()
-
 Window_State("closed")
 users.mainloop()

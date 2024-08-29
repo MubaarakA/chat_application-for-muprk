@@ -21,28 +21,30 @@ print(f"Server started at {Server} on port {port}")
 sockserver.listen()
 
 
-PAIR_OF_CLIENTS={}
+lock=threading.Lock()
+
+pair_of_clients={}
 CLIENTS=[]
 
 
 
-def Set_Client_State(client, state):
-    PAIR_OF_CLIENTS[client] = state
+def set_client_state(client, state):
+    with lock:
+        pair_of_clients[client] = state
 
 
 
 
 
-def Send_Data(data,sender):
+def send_data(data, sender):
     sender.send(data.encode("utf-8"))
 
 
 
-def Check_Client_State(theOne,pair_of_client,data,current_connected_client,current_Talking_Client):
-    key = {key: value for key, value in pair_of_client.items() if key == theOne[0].fileno()}
+def check_client_state(theOne, pair_of_client, data, current_connected_client, current_Talking_Client):
+    key = {key: value for key , value in pair_of_client.items() if key == theOne[0].fileno()}
 
     keycheck = key.values()
-    # print(keycheck)
     keycheck = [i for i in keycheck]
     keycheck = keycheck[0]
     if keycheck == "closed":
@@ -50,20 +52,19 @@ def Check_Client_State(theOne,pair_of_client,data,current_connected_client,curre
         data += f":{current_connected_client.fileno()}"
         print(data)
         data += ":closed"
-        Send_Data(data,current_Talking_Client)
+        send_data(data, current_Talking_Client)
 
     else:
 
         data += ":opened"
-        Send_Data(data, current_Talking_Client)
+        send_data(data, current_Talking_Client)
 
 
 
 
-def recv(current_connected_client):
+def receive_message(current_connected_client):
 
-    global PAIR_OF_CLIENTS
-
+    global pair_of_clients
     current_Talking_Client=[]
     while True:
 
@@ -74,7 +75,7 @@ def recv(current_connected_client):
 
 
             if data in ["opened","closed"]:
-                Set_Client_State(current_connected_client.fileno(), data)
+                set_client_state(current_connected_client.fileno(), data)
                 continue
 
 
@@ -86,20 +87,14 @@ def recv(current_connected_client):
 
 
                 someone=int(data["someone"])
-                theOne=[client for client in CLIENTS if client.fileno() == someone]
+                target_client=[client for client in CLIENTS if client.fileno() == someone]
 
                 current_Talking_Client.clear()
-                current_Talking_Client.append(theOne[0])
+                current_Talking_Client.append(target_client[0])
 
 
             if "someone" not in data:
-                Check_Client_State(theOne, PAIR_OF_CLIENTS, data, current_connected_client, current_Talking_Client[0])
-
-
-
-
-
-
+                check_client_state(target_client, pair_of_clients, data, current_connected_client, current_Talking_Client[0])
 
 
 
@@ -114,7 +109,6 @@ def recv(current_connected_client):
 
 
         except ConnectionAbortedError:
-            nofclients = len(CLIENTS)
             break
 
     current_connected_client.close()
@@ -131,14 +125,12 @@ def recv(current_connected_client):
 
 
 
-
-
-def Listen_To_Clients():
+def listen_to_clients():
     global CLIENTS,nofclients
     while True:
         current_Connected_Client, client_address = sockserver.accept()
-        CLIENTS.append(current_Connected_Client)
-        nofclients = len(CLIENTS)
+        with lock:
+            CLIENTS.append(current_Connected_Client)
 
 
         threads = threading.Thread(target=handle_clients,args=(current_Connected_Client,))
@@ -160,7 +152,7 @@ def handle_clients(handled_cleint):
                     print()
 
 
-    threads = threading.Thread(target=recv, args=(handled_cleint,))
+    threads = threading.Thread(target=receive_message, args=(handled_cleint,))
     threads.start()
 
 
@@ -178,7 +170,7 @@ def handle_clients(handled_cleint):
 
 
 
-thread1=threading.Thread(target=Listen_To_Clients,daemon=True)
+thread1=threading.Thread(target=listen_to_clients, daemon=True)
 thread1.start()
 thread1.join()
 
