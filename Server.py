@@ -21,52 +21,103 @@ print(f"Server started at {Server} on port {port}")
 sockserver.listen()
 
 
-Clients=[]
+PAIR_OF_CLIENTS={}
+CLIENTS=[]
 
-def recv(Current_Connected_Client):
 
-    choose_some_one=False
+
+def Set_Client_State(client, state):
+    PAIR_OF_CLIENTS[client] = state
+
+
+
+
+
+def Send_Data(data,sender):
+    sender.send(data.encode("utf-8"))
+
+
+
+def Check_Client_State(theOne,pair_of_client,data,current_connected_client,current_Talking_Client):
+    key = {key: value for key, value in pair_of_client.items() if key == theOne[0].fileno()}
+
+    keycheck = key.values()
+    # print(keycheck)
+    keycheck = [i for i in keycheck]
+    keycheck = keycheck[0]
+    if keycheck == "closed":
+
+        data += f":{current_connected_client.fileno()}"
+        print(data)
+        data += ":closed"
+        Send_Data(data,current_Talking_Client)
+
+    else:
+
+        data += ":opened"
+        Send_Data(data, current_Talking_Client)
+
+
+
+
+def recv(current_connected_client):
+
+    global PAIR_OF_CLIENTS
+
     current_Talking_Client=[]
     while True:
 
         try:
-            data = Current_Connected_Client.recv(1024).decode()
-            if "someone" in data:
-                choose_some_one=True
+            data = current_connected_client.recv(1024).decode()
 
-            if choose_some_one:
-                print(data)
+
+
+
+            if data in ["opened","closed"]:
+                Set_Client_State(current_connected_client.fileno(), data)
+                continue
+
+
+
+
+            if "someone" in data:
+
                 data = json.loads(data)
 
-                for i in Clients:
-                    if int(data["someone"]) == i.fileno():
-                        if current_Talking_Client:
-                            current_Talking_Client = []
-                        else:
-                            current_Talking_Client.append(i)
 
-                        current_Talking_Client.append(i)
-                        i.send(f"server:some wants to talk to you please talk with {Current_Connected_Client.fileno()} ".encode("utf-8"))
+                someone=int(data["someone"])
+                theOne=[client for client in CLIENTS if client.fileno() == someone]
 
-                        choose_some_one = False
-                        break
+                current_Talking_Client.clear()
+                current_Talking_Client.append(theOne[0])
+
+
             if "someone" not in data:
-                current_Talking_Client[0].send(data.encode("utf-8"))
+                Check_Client_State(theOne, PAIR_OF_CLIENTS, data, current_connected_client, current_Talking_Client[0])
+
+
+
+
+
+
+
+
 
 
         except ConnectionResetError as E:
             print(E)
-            for i in Clients:
-                if i==Current_Connected_Client:
-                    Clients.remove(i)
+            for i in CLIENTS:
+                if i==current_connected_client:
+                    CLIENTS.remove(i)
+            break
 
 
 
         except ConnectionAbortedError:
-            nofclients = len(Clients)
+            nofclients = len(CLIENTS)
             break
 
-    Current_Connected_Client.close()
+    current_connected_client.close()
 
 
 
@@ -83,16 +134,16 @@ def recv(Current_Connected_Client):
 
 
 def Listen_To_Clients():
-    global Clients,nofclients
+    global CLIENTS,nofclients
     while True:
         current_Connected_Client, client_address = sockserver.accept()
-        Clients.append(current_Connected_Client)
-        nofclients = len(Clients)
+        CLIENTS.append(current_Connected_Client)
+        nofclients = len(CLIENTS)
 
 
         threads = threading.Thread(target=handle_clients,args=(current_Connected_Client,))
         threads.start()
-    if not Clients:
+    if not CLIENTS:
         print("bye")
 
 
@@ -100,15 +151,14 @@ def Listen_To_Clients():
 def handle_clients(handled_cleint):
 
     print(f"Accepted connection from {handled_cleint}")
-    if len(Clients)>1:
-        for i in Clients:
-            for m in Clients:
+    if len(CLIENTS)>1:
+        for i in CLIENTS:
+            for m in CLIENTS:
                 if i.fileno() != m.fileno():
                     i.send(f"combo:{m.fileno()}\n".encode("utf-8"))
                     print(i.fileno(), m.fileno())
                     print()
-    else:
-        handled_cleint.send("server:this is no one to send message".encode("utf-8"))
+
 
     threads = threading.Thread(target=recv, args=(handled_cleint,))
     threads.start()
