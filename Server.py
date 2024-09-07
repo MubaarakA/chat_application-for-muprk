@@ -23,14 +23,14 @@ sockserver.listen()
 
 lock=threading.Lock()
 
-pair_of_clients={}
+clients_state={}
 CLIENTS=[]
 
 
 
 def set_client_state(client, state):
     with lock:
-        pair_of_clients[client] = state
+        clients_state[client] = state
 
 
 
@@ -64,7 +64,7 @@ def check_client_state(theOne, pair_of_client, data, current_connected_client, c
 
 def receive_message(current_connected_client):
 
-    global pair_of_clients
+    global clients_state
     current_Talking_Client=[]
     while True:
 
@@ -94,7 +94,7 @@ def receive_message(current_connected_client):
 
 
             if "someone" not in data:
-                check_client_state(target_client, pair_of_clients, data, current_connected_client, current_Talking_Client[0])
+                check_client_state(target_client, clients_state, data, current_connected_client, current_Talking_Client[0])
 
 
 
