@@ -30,7 +30,13 @@ CLIENTS=[]
 
 def set_client_state(client, state):
     with lock:
-        clients_state[client] = state
+        if "opened" in state:
+            opened_window_client = state.split(":")[1]
+
+            clients_state[client]={"opened":opened_window_client}
+        else:
+             clients_state[client] = {state}
+        print(clients_state)
 
 
 
@@ -41,23 +47,33 @@ def send_data(data, sender):
 
 
 
-def check_client_state(theOne, pair_of_client, data, current_connected_client, current_Talking_Client):
-    key = {key: value for key , value in pair_of_client.items() if key == theOne[0].fileno()}
+def check_client_state(theOne, client_state, data, current_connected_client, current_Talking_Client):
+    print("ehchhe")
+    key = {key: value for key , value in client_state.items() if key == theOne[0].fileno()}
 
     keycheck = key.values()
     keycheck = [i for i in keycheck]
+
     keycheck = keycheck[0]
-    if keycheck == "closed":
+    print(keycheck,"key")
+    if  "closed" in keycheck:
 
         data += f":{current_connected_client.fileno()}"
-        print(data)
         data += ":closed"
         send_data(data, current_Talking_Client)
+        return
 
-    else:
-
+    if int(keycheck["opened"])==int(current_connected_client.fileno()):
         data += ":opened"
         send_data(data, current_Talking_Client)
+        return
+
+    else:
+        data += f":{current_connected_client.fileno()}"
+        data += ":closedto"
+        send_data(data, current_Talking_Client)
+
+
 
 
 
@@ -70,13 +86,19 @@ def receive_message(current_connected_client):
 
         try:
             data = current_connected_client.recv(1024).decode()
+            print(data,"my")
 
 
 
 
-            if data in ["opened","closed"]:
+            if  "opened" in data:
                 set_client_state(current_connected_client.fileno(), data)
                 continue
+            else:
+                if data=="closed":
+                    set_client_state(current_connected_client.fileno(), data)
+                    continue
+
 
 
 
@@ -93,7 +115,8 @@ def receive_message(current_connected_client):
                 current_Talking_Client.append(target_client[0])
 
 
-            if "someone" not in data:
+            else:
+                print("else")
                 check_client_state(target_client, clients_state, data, current_connected_client, current_Talking_Client[0])
 
 

@@ -26,7 +26,8 @@ def update_offline_messages(data):
     if data == "label":
         No_Of_Messages += 1
         label_no_message.configure(text=f"Number of messages you have {No_Of_Messages}")
-        return
+    else:
+        No_Of_Messages+=1
 
 def recv_chat_insertion(data):
     text.configure(state="normal")
@@ -62,12 +63,24 @@ def users_to_talk_to(data):
             temp.add(value)
     combo.configure(values=list(temp))
 
+
+
+
+def handle_opened_for_onother_person_message(data):
+    Formatted_Message = data.split(":")[0]
+    offlineclient = int(data.split(":")[1])
+    if offlineclient not in offline_messages:
+        offline_messages[offlineclient] = []
+    offline_messages[offlineclient].append(Formatted_Message)
+    print(offline_messages)
+    label_no_message.after(0, update_offline_messages, "openedforother")
+
+
 def recv():
     global No_Of_Messages, offline_messages, talking_client, chat_history
     while True:
         try:
             data = clientsocket.recv(1024).decode()
-            print(data)
             if data.endswith(":opened"):
                 handle_received_in_open_window(data)
                 continue
@@ -75,6 +88,9 @@ def recv():
                 handle_received_in_closed_window(data)
             if data.startswith("combo:"):
                 users_to_talk_to(data)
+
+            if data.endswith(":closedto"):
+                handle_opened_for_onother_person_message(data)
         except ConnectionResetError as E:
             print(E)
             label.configure(foreground="black")
@@ -110,8 +126,8 @@ def calculate_remaining_missed_messages(client):
     message_list = []
     for length in offline_messages[client]:
         message_list.append(length)
-    total_offline_messages = len(message_list)
-    return No_Of_Messages - total_offline_messages
+    total_offline_messages_of_current_client = len(message_list)
+    return No_Of_Messages - total_offline_messages_of_current_client
 
 def Load_Offlinemessages(client):
     global No_Of_Messages
@@ -122,13 +138,14 @@ def Load_Offlinemessages(client):
         for message in offline_messages[client]:
             text.insert(tk.END, f"{message}\n", "recv")
         text.configure(state="disabled")
+
         No_Of_Messages = calculate_remaining_missed_messages(client)
 
 def load_chat_history(client):
     if client == None:
         return
     text.configure(state="normal")
-    if chat_history:
+    if client in chat_history:
         for message in chat_history[client]:
             for key, value in message.items():
                 if key == "recv":
@@ -139,7 +156,7 @@ def load_chat_history(client):
 
 def ChoosedOne():
     global initiate, talking_client
-    message = None
+    offlineclient = None
     data = combo.get()
     talking_client = int(data)
     someone = {"someone": data}
@@ -158,16 +175,21 @@ def ChoosedOne():
         if offline_messages:
             for fileno in offline_messages:
                 if int(fileno) == talking_client:
-                    message = int(fileno)
+                    offlineclient = int(fileno)
                     break
         users.withdraw()
-        new_window(talking_client, message)
+        new_window(talking_client, offlineclient)
     except OSError as E:
         print(E)
     initiate = True
 
-def Window_State(state):
-    clientsocket.send(state.encode("utf-8"))
+def Window_State(*state):
+    print(state)
+    if "opened" in state:
+         clientsocket.send(f"{state[0]}:{state[1]}".encode("utf-8"))
+         return
+    data=state[0]
+    clientsocket.send(data.encode("utf-8"))
 
 def back_to_main():
     global No_Of_Messages
@@ -193,7 +215,7 @@ def new_window(talkingclient=None, message=None):
     entry.pack(side=tk.LEFT, fill="both", padx=10, pady=10, expand=True)
     button = ttk.CTkButton(chat, text="Send", command=sendata)  # Changed to CTkButton
     button.pack(side=tk.LEFT, fill=tk.X, padx=10, pady=10, expand=True)
-    Window_State("opened")
+    Window_State("opened",talking_client)
     load_chat_history(talkingclient)
     Load_Offlinemessages(message)
 
