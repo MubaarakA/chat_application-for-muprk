@@ -21,6 +21,12 @@ offline_messages = {}
 chat_history = {}  # Global list to store chat history
 talking_client = None
 
+
+
+
+
+# Bind the closing event
+
 def update_offline_messages(data):
     global No_Of_Messages
     if data == "label":
@@ -52,16 +58,34 @@ def handle_received_in_closed_window(data):
     offline_messages[offlineclient].append(Formatted_Message)
     label_no_message.after(0, update_offline_messages, "label")
 
-temp = set()  # holds what user can chat with because user can choose 1 or more people
-def users_to_talk_to(data):
+
+
+
+
+
+temp = set()
+
+
+def users_to_talk_to(state,data):
     global temp
     messages = data.strip().split("\n")
-    for i in messages:
-        if i:
-            value = i.split(":")[1]
-            offline_messages[value] = {}
-            temp.add(value)
-    combo.configure(values=list(temp))
+
+    if state=="add":
+        for i in messages:
+            if i:
+                value = i.split(":")[1]
+                offline_messages[value] = {}
+                temp.add(value)
+        combo.configure(values=list(temp))
+    else:
+
+        removed_client=data.split(":")[1]
+
+        temp.remove((removed_client))
+
+        combo.configure(values=list(temp))
+
+
 
 
 
@@ -76,24 +100,33 @@ def handle_opened_for_onother_person_message(data):
     label_no_message.after(0, update_offline_messages, "openedforother")
 
 
+
+
+
+
+
 def recv():
     global No_Of_Messages, offline_messages, talking_client, chat_history
     while True:
         try:
             data = clientsocket.recv(1024).decode()
+            print(data)
             if data.endswith(":opened"):
                 handle_received_in_open_window(data)
                 continue
             if data.endswith(":closed"):
                 handle_received_in_closed_window(data)
             if data.startswith("combo:"):
-                users_to_talk_to(data)
+                users_to_talk_to("add",data)
 
             if data.endswith(":closedto"):
                 handle_opened_for_onother_person_message(data)
-        except ConnectionResetError as E:
-            print(E)
-            label.configure(foreground="black")
+
+            if data.startswith("abort"):
+                users_to_talk_to("remove",data)
+
+
+        except Exception as E:
             break
     clientsocket.close()
 
@@ -216,6 +249,7 @@ def new_window(talkingclient=None, message=None):
     button = ttk.CTkButton(chat, text="Send", command=sendata)  # Changed to CTkButton
     button.pack(side=tk.LEFT, fill=tk.X, padx=10, pady=10, expand=True)
     Window_State("opened",talking_client)
+
     load_chat_history(talkingclient)
     Load_Offlinemessages(message)
 
@@ -238,4 +272,5 @@ thread1 = threading.Thread(target=recv, daemon=True)
 if connected:
     thread1.start()
 Window_State("closed")
+
 users.mainloop()

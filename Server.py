@@ -29,6 +29,7 @@ CLIENTS=[]
 
 
 def set_client_state(client, state):
+    global clients_state
     with lock:
         if "opened" in state:
             opened_window_client = state.split(":")[1]
@@ -42,8 +43,9 @@ def set_client_state(client, state):
 
 
 
-def send_data(data, sender):
-    sender.send(data.encode("utf-8"))
+def send_data(data, reciver):
+    print(data)
+    reciver.send(data.encode("utf-8"))
 
 
 
@@ -71,7 +73,7 @@ def check_client_state(theOne, client_state, data, current_connected_client, cur
     else:
         data += f":{current_connected_client.fileno()}"
         data += ":closedto"
-        send_data(data, current_Talking_Client)
+        send_data(data, current_connected_client)
 
 
 
@@ -100,6 +102,10 @@ def receive_message(current_connected_client):
                     continue
 
 
+            if data=="closing":
+               pass
+
+
 
 
 
@@ -119,22 +125,25 @@ def receive_message(current_connected_client):
                 print("else")
                 check_client_state(target_client, clients_state, data, current_connected_client, current_Talking_Client[0])
 
+        except ConnectionResetError:
 
+            print(f"Client {current_connected_client.fileno()} disconnected abruptly.")
 
+            with lock:
+                CLIENTS.remove(current_connected_client)
 
-        except ConnectionResetError as E:
-            print(E)
-            for i in CLIENTS:
-                if i==current_connected_client:
-                    CLIENTS.remove(i)
-            break
+                broad_cast_available_clients(True, current_connected_client.fileno())
 
+                current_connected_client.close()
+
+                break
 
 
         except ConnectionAbortedError:
-            break
 
-    current_connected_client.close()
+            print(f"Client {current_connected_client.fileno()} aborted the connection.")
+
+            break
 
 
 
@@ -166,14 +175,8 @@ def listen_to_clients():
 def handle_clients(handled_cleint):
 
     print(f"Accepted connection from {handled_cleint}")
-    if len(CLIENTS)>1:
-        for i in CLIENTS:
-            for m in CLIENTS:
-                if i.fileno() != m.fileno():
-                    i.send(f"combo:{m.fileno()}\n".encode("utf-8"))
-                    print(i.fileno(), m.fileno())
-                    print()
 
+    broad_cast_available_clients(False)
 
     threads = threading.Thread(target=receive_message, args=(handled_cleint,))
     threads.start()
@@ -186,7 +189,18 @@ def handle_clients(handled_cleint):
 
 
 
-
+def broad_cast_available_clients(indicator,fileno=None):
+    if indicator:
+        data=f"abort:{fileno}"
+        for i in CLIENTS:
+            i.send(data.encode("utf-8"))
+    if len(CLIENTS) > 1:
+        for i in CLIENTS:
+            for m in CLIENTS:
+                if i.fileno() != m.fileno():
+                    i.send(f"combo:{m.fileno()}\n".encode("utf-8"))
+                    print(i.fileno(), m.fileno())
+                    print()
 
 
 
