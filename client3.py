@@ -51,21 +51,35 @@ def handle_received_in_open_window(data):
     update_chat_history(Formatted_Message, "recv")
 
 def handle_received_in_closed_window(data):
+    global talking_client
     Formatted_Message = data.split(":")[0]
     offlineclient = int(data.split(":")[1])
     if offlineclient not in offline_messages:
         offline_messages[offlineclient] = []
     offline_messages[offlineclient].append(Formatted_Message)
+    talking_client=int(offlineclient)
+    update_chat_history(Formatted_Message,"recv")
     label_no_message.after(0, update_offline_messages, "label")
 
+
+
+
+def handle_opened_for_onother_person_message(data):
+    global talking_client
+    Formatted_Message = data.split(":")[0]
+    offlineclient = int(data.split(":")[1])
+    if offlineclient not in offline_messages:
+        offline_messages[offlineclient] = []
+    offline_messages[offlineclient].append(Formatted_Message)
+    talking_client = int(offlineclient)
+    update_chat_history(Formatted_Message, "recv")
+    label_no_message.after(0, update_offline_messages, "openedforother")
 
 
 
 
 
 temp = set()
-
-
 def users_to_talk_to(state,data):
     global temp
     messages = data.strip().split("\n")
@@ -90,14 +104,7 @@ def users_to_talk_to(state,data):
 
 
 
-def handle_opened_for_onother_person_message(data):
-    Formatted_Message = data.split(":")[0]
-    offlineclient = int(data.split(":")[1])
-    if offlineclient not in offline_messages:
-        offline_messages[offlineclient] = []
-    offline_messages[offlineclient].append(Formatted_Message)
-    print(offline_messages)
-    label_no_message.after(0, update_offline_messages, "openedforother")
+
 
 
 
@@ -124,6 +131,7 @@ def recv():
 
             if data.startswith("abort"):
                 users_to_talk_to("remove",data)
+
 
 
         except Exception as E:
@@ -162,19 +170,23 @@ def calculate_remaining_missed_messages(client):
     total_offline_messages_of_current_client = len(message_list)
     return No_Of_Messages - total_offline_messages_of_current_client
 
-def Load_Offlinemessages(client):
-    global No_Of_Messages
-    if client == None:
-        return
-    if client in offline_messages:
-        text.configure(state="normal")
-        for message in offline_messages[client]:
-            text.insert(tk.END, f"{message}\n", "recv")
-        text.configure(state="disabled")
-
-        No_Of_Messages = calculate_remaining_missed_messages(client)
+# def Load_Offlinemessages(client):
+#     if client == None:
+#         return
+#     if client in offline_messages:
+#         text.configure(state="normal")
+#         for message in offline_messages[client]:
+#             text.insert(tk.END, f"{message}\n", "recv")
+#             chat_history
+#         text.configure(state="disabled")
+#
+#
+#
+#         del offline_messages[client]
 
 def load_chat_history(client):
+    global No_Of_Messages
+
     if client == None:
         return
     text.configure(state="normal")
@@ -186,6 +198,8 @@ def load_chat_history(client):
                 if key == "sent":
                     text.insert(tk.END, f"{value}\n", "sent")
     text.configure(state="disabled")
+    No_Of_Messages = calculate_remaining_missed_messages(client)
+    del offline_messages[talking_client]
 
 def ChoosedOne():
     global initiate, talking_client
@@ -251,7 +265,7 @@ def new_window(talkingclient=None, message=None):
     Window_State("opened",talking_client)
 
     load_chat_history(talkingclient)
-    Load_Offlinemessages(message)
+
 
 users = tk.Tk()
 users.geometry("500x500")

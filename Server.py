@@ -102,8 +102,6 @@ def receive_message(current_connected_client):
                     continue
 
 
-            if data=="closing":
-               pass
 
 
 
@@ -132,11 +130,13 @@ def receive_message(current_connected_client):
             with lock:
                 CLIENTS.remove(current_connected_client)
 
-                broad_cast_available_clients(True, current_connected_client.fileno())
+            broad_cast_available_clients(True, current_connected_client.fileno())
 
-                current_connected_client.close()
+            print(type(current_connected_client.fileno()))
+            del clients_state[current_connected_client.fileno()]
+            current_connected_client.close()
 
-                break
+            break
 
 
         except ConnectionAbortedError:
